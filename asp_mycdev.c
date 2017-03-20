@@ -17,6 +17,7 @@
 #include <linux/fs.h>     /* Needed for file_operations */
 #include <linux/slab.h>    /* Needed for kmalloc, kzalloc etc. */
 #include <linux/errno.h>   /* Needed for error checking */
+#include <linux/mutex.h>
 #include "asp_mycdev.h"    /* Custom header for the drivers */
 #include <linux/mutex.h>	/* Sync primitives */
 #include <linux/device.h>	/* device class */
@@ -230,6 +231,7 @@ module_init(mycdev_init_module);
 static void mycdev_cleanup_module(void)
 {
 	int i = 0;
+	int lastDevice = -1;
 
 	printk(KERN_INFO "%s: Cleaning Up Module!\n", MODULE_NAME);
 
