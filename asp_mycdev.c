@@ -4,7 +4,7 @@
 * @Email:  izharits@gmail.com
 * @Filename: module.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T19:07:49-04:00
+ * @Last modified time: 2017-03-20T19:39:21-04:00
 * @License: MIT
 */
 
@@ -26,7 +26,7 @@
 /* Parameters that can be changed at load time */
 static int mycdev_major = DEFAULT_MAJOR;
 static int mycdev_minor = DEFAULT_MINOR;
-static int max_devices = NUM_DEVICES;
+static int max_devices = DEFAULT_NUM_DEVICES;
 static long ramdisk_size_in_bytes = DEFAULT_RAMDISK_SIZE;
 
 module_param(mycdev_major, int, S_IRUGO);
@@ -231,7 +231,6 @@ module_init(mycdev_init_module);
 static void mycdev_cleanup_module(void)
 {
 	int i = 0;
-	int lastDevice = -1;
 
 	printk(KERN_INFO "%s: Cleaning Up Module!\n", MODULE_NAME);
 
@@ -264,7 +263,6 @@ static void mycdev_cleanup_module(void)
 		printk(KERN_DEBUG "%s: Freed up %d devices/ramdisks.\n", MODULE_NAME, lastSuccessfulRamdisk+1);
 		printk(KERN_DEBUG "%s: Freed up %d devices/nodes.\n", MODULE_NAME, lastSuccessfulNode+1);
 		printk(KERN_DEBUG "%s: Freed up %d devices/cdevs.\n", MODULE_NAME, lastSuccessfulCdev+1);
-
 	}
 
 	/* Clean up device class */

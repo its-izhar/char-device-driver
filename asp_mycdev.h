@@ -4,7 +4,7 @@
 * @Email:  izharits@gmail.com
 * @Filename: module.h
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T17:17:50-04:00
+ * @Last modified time: 2017-03-20T19:24:05-04:00
 * @License: MIT
 */
 
@@ -17,7 +17,7 @@
 #include <linux/device.h>
 
 /* Defaul size of each device */
-#define		DEFAULT_RAMDISK_SIZE	16*PAGE_SIZE
+#define  DEFAULT_RAMDISK_SIZE 16*PAGE_SIZE
 
 /* Dynamic Major by default */
 #define   DEFAULT_MAJOR         0
@@ -25,12 +25,12 @@
 
 /* Max number of devices by default */
 /* mycdev0 to mycdev3 */
-#define   NUM_DEVICES           3
+#define   DEFAULT_NUM_DEVICES  3
 
 /* Module name */
-#define		MODULE_NAME						"asp_mycdev"
-#define		MODULE_CLASS_NAME			"asp_mycdev_class"
-#define		MODULE_NODE_NAME			"mycdev"
+#define  MODULE_NAME      "asp_mycdev"
+#define  MODULE_CLASS_NAME   "asp_mycdev_class"
+#define  MODULE_NODE_NAME   "mycdev"
 
 /* Device struct */
 struct asp_mycdev
