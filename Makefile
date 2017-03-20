@@ -3,12 +3,12 @@
 # @Email:  izharits@gmail.com
 # @Filename: Makefile
 # @Last modified by:   izhar
-# @Last modified time: 2017-03-14T14:54:20-04:00
+# @Last modified time: 2017-03-19T23:39:11-04:00
 # @License: MIT
 
 
 
-obj-m += module.o
+obj-m += asp_mycdev.o
 
 all:
 	make -C /usr/src/linux-headers-4.8.0-39-generic M=$(PWD) modules
