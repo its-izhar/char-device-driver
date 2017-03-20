@@ -4,20 +4,20 @@
 * @Email:  izharits@gmail.com
 * @Filename: module.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T03:08:21-04:00
+ * @Last modified time: 2017-03-20T03:20:19-04:00
 * @License: MIT
 */
 
 
 
-#include <linux/module.h>			/* Needed by all modules */
-#include <linux/kernel.h>			/* Needed for KERN_INFO */
-#include <linux/init.h>				/* Needed for the macros */
-#include <linux/cdev.h>				/* Needed for cdev struct */
-#include <linux/fs.h>					/* Needed for file_operations */
-#include <linux/slab.h>				/* Needed for kmalloc, kzalloc etc. */
-#include <linux/errno.h>			/* Needed for error checking */
-#include "asp_mycdev.h"				/* Custom header for the drivers */
+#include <linux/module.h>   /* Needed by all modules */
+#include <linux/kernel.h>   /* Needed for KERN_INFO */
+#include <linux/init.h>    /* Needed for the macros */
+#include <linux/cdev.h>    /* Needed for cdev struct */
+#include <linux/fs.h>     /* Needed for file_operations */
+#include <linux/slab.h>    /* Needed for kmalloc, kzalloc etc. */
+#include <linux/errno.h>   /* Needed for error checking */
+#include "asp_mycdev.h"    /* Custom header for the drivers */
 
 
 /* Parameters that can be changed at load time */
@@ -50,11 +50,11 @@ static ssize_t asp_mycdev_write(struct file *, const char __user *, size_t, loff
 
 /* fileops for asp_mycdev */
 static struct file_operations asp_mycdev_fileops = {
-	.owner		= THIS_MODULE,
-	.open			= asp_mycdev_open,
-	.release	= asp_mycdev_release,
-	.read			= asp_mycdev_read,
-	.write		= asp_mycdev_write,
+	.owner  = THIS_MODULE,
+	.open   = asp_mycdev_open,
+	.release = asp_mycdev_release,
+	.read   = asp_mycdev_read,
+	.write  = asp_mycdev_write,
 };
 
 
@@ -74,7 +74,7 @@ static void setup_cdev(struct asp_mycdev *dev, int index)
 	/* Add the device, NOTE:: This makes the device go live! */
 	error = cdev_add(&dev->cdev, devNo, 1);
 	/* report error */
-	if(error){
+	if(error) {
 		printk(KERN_WARNING "Error %d adding mycdev%d", error, index);
 	}
 }
