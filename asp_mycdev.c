@@ -4,7 +4,7 @@
 * @Email:  izharits@gmail.com
 * @Filename: module.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T13:50:55-04:00
+ * @Last modified time: 2017-03-20T19:07:49-04:00
 * @License: MIT
 */
 
@@ -17,8 +17,9 @@
 #include <linux/fs.h>     /* Needed for file_operations */
 #include <linux/slab.h>    /* Needed for kmalloc, kzalloc etc. */
 #include <linux/errno.h>   /* Needed for error checking */
-#include <linux/mutex.h>
 #include "asp_mycdev.h"    /* Custom header for the drivers */
+#include <linux/mutex.h>	/* Sync primitives */
+#include <linux/device.h>	/* device class */
 
 
 /* Parameters that can be changed at load time */
@@ -34,8 +35,11 @@ module_param(ramdisk_size_in_bytes, long, S_IRUGO);
 
 
 /* Other global variables */
+static struct class *asp_mycdev_class = NULL;
 static struct asp_mycdev *mycdev_devices = NULL;
-static int ramdiskFailDevIndex = -1;
+static int lastSuccessfulRamdisk = -1;
+static int lastSuccessfulCdev = -1;
+static int lastSuccessfulNode = -1;
 
 /* Function declarations */
 static int mycdev_init_module(void);
@@ -71,9 +75,10 @@ static struct file_operations asp_mycdev_fileops = {
  * @index: index/offset to add to start of minor
  * Description: Helper function for init to setup cdev struct in asp_mycdev.
  */
-static void setup_cdev(struct asp_mycdev *dev, int index)
+static int setup_cdev(struct asp_mycdev *dev, int index)
 {
 	int error = 0;
+	int retval = 0;
 	dev_t devNo = 0;
 
 	/* Device Number */
@@ -87,8 +92,11 @@ static void setup_cdev(struct asp_mycdev *dev, int index)
 	/* report error */
 	if(error) {
 		printk(KERN_WARNING "%s: Error %d adding mycdev%d\n", MODULE_NAME, error, index);
+		retval = -1;
 	}
+	return retval;
 }
+
 
 
 /* Init function */
@@ -101,6 +109,8 @@ static int mycdev_init_module(void)
 {
 	dev_t devNum = 0;
 	bool ramdiskAllocFailed = false;
+	bool cdevSetupFailed = false;
+	bool nodeSetupFailed = false;
 	int i = 0, retval = 0;
 
 	printk(KERN_INFO "%s: Initializing Module!\n", MODULE_NAME);
@@ -120,7 +130,17 @@ static int mycdev_init_module(void)
 		return retval;
 	}
 	printk(KERN_DEBUG "%s: Requested Devices - %d, Major :- %d, Minor - %d\n",\
-										 MODULE_NAME, max_devices, mycdev_major, mycdev_minor);
+		MODULE_NAME, max_devices, mycdev_major, mycdev_minor);
+
+	/* Setup the device class, needed to create device nodes in sysfs */
+	asp_mycdev_class = class_create(THIS_MODULE, MODULE_CLASS_NAME);
+	if(IS_ERR(asp_mycdev_class)){
+		printk(KERN_WARNING "%s: Failed to Init Device Class %s\n",\
+			MODULE_NAME, MODULE_CLASS_NAME);
+		retval = -1;
+		goto FAIL;
+	}
+	printk(KERN_INFO "%s: Created device class: %s\n", MODULE_NAME, MODULE_CLASS_NAME);
 
 	/* Allocate and setup the devices here */
 	mycdev_devices = kzalloc(max_devices * sizeof(struct asp_mycdev), GFP_KERNEL);
@@ -132,6 +152,9 @@ static int mycdev_init_module(void)
 	/* Setup the devices */
 	for(i = 0; i < max_devices; i++)
 	{
+		char nodeName[10] = { 0 };
+		int cdevStatus = 0;
+
 		/* Device Reset flag */
 		mycdev_devices[i].devReset = true;
 		/* Device number */
@@ -144,24 +167,50 @@ static int mycdev_init_module(void)
 		if(mycdev_devices[i].ramdisk == NULL){
 			/* mark that we failed to allocate current device memory,
 			we will clean up previously allocated devices in cleanup module */
-			ramdiskFailDevIndex = i;
+			printk(KERN_WARNING "%s: Failed to allocate ramdisk for device %d\n", MODULE_NAME, i);
 			ramdiskAllocFailed = true;
 			break;	/* exit for */
 		}
+		lastSuccessfulRamdisk = i;
 		mycdev_devices[i].ramdiskSize = ramdisk_size_in_bytes;
 
+		/* Create device node here */
+		snprintf(nodeName, sizeof(nodeName), MODULE_NODE_NAME"%d", i);
+
+		mycdev_devices[i].device = device_create(asp_mycdev_class, NULL,\
+			MKDEV(mycdev_major, mycdev_minor + i), NULL, nodeName);
+		if(IS_ERR(mycdev_devices[i].device))
+		{
+			/* mark that we failed to create and register current device node with sysfs,
+			we will clean up previously device nodes in cleanup module */
+			printk(KERN_WARNING "%s: Failed to Create Device Node %s\n", MODULE_NAME, nodeName);
+			nodeSetupFailed = true;
+			break;
+		}
+		lastSuccessfulNode = i;
+
 		/* Setup cdev struct here */
-		setup_cdev(&mycdev_devices[i], i);
+		cdevStatus = setup_cdev(&mycdev_devices[i], i);
+		if(cdevStatus < 0){
+			/* mark that we failed to allocate current cdev,
+			we will clean up previously allocated cdevs in cleanup module */
+			printk(KERN_WARNING "%s: Failed to setup cdev for device %d\n", MODULE_NAME, i);
+			cdevSetupFailed = true;
+			break;
+		}
+		lastSuccessfulCdev = i;
+
 	}
 	/* cleanup if we failed to allocate device memory */
-	if(ramdiskAllocFailed == true){
-		printk(KERN_WARNING "%s: Unable to allocate device memory %d\n",\
-		 										MODULE_NAME, ramdiskFailDevIndex);
+	if(ramdiskAllocFailed || nodeSetupFailed || cdevSetupFailed)
+	{
 		retval = -ENOMEM;
 		goto FAIL;
 	}
 
 	printk(KERN_INFO "%s: Initialization Complete!\n", MODULE_NAME);
+	printk(KERN_INFO "%s: lastSuccessfulRamdisk: %d, lastSuccessfulNode: %d, lastSuccessfulCdev: %d\n",\
+	 MODULE_NAME, lastSuccessfulRamdisk, lastSuccessfulNode, lastSuccessfulCdev);
 
 	return 0;
 
@@ -181,41 +230,47 @@ module_init(mycdev_init_module);
 static void mycdev_cleanup_module(void)
 {
 	int i = 0;
-	int lastDevice = -1;
 
 	printk(KERN_INFO "%s: Cleaning Up Module!\n", MODULE_NAME);
 
-	/* check if we have failed during device init phase,
-	if we have, we will only free up previously allocated device,
-	i.e. devices until last index, leaving current index */
-	if(ramdiskFailDevIndex == 0) {	/* None allocated */
-		lastDevice = -1;
-	}
-	else if(ramdiskFailDevIndex > 0 && ramdiskFailDevIndex < max_devices) {	/* A few */
-		lastDevice = ramdiskFailDevIndex;
-	}
-	else if(ramdiskFailDevIndex == -1) {	/* All allocated */
-		lastDevice = max_devices;
-	}
-
+	/* we will free lastSuccessful constructs here */
 	/* Cleanup devices */
 	if(mycdev_devices != NULL)
 	{
-		/* free up ramdisk and cdev only for allocated devices */
-		for(i = 0; i < lastDevice; i++)
+		/* ramdisk */
+		for(i = 0; i <= lastSuccessfulRamdisk; i++)
 		{
 			if(mycdev_devices[i].ramdisk != NULL)
 			{
 				kfree(mycdev_devices[i].ramdisk);
 				mycdev_devices[i].ramdisk = NULL;
 			}
+		}
+		/* cdev */
+		for(i = 0; i <= lastSuccessfulCdev; i++)
+		{
 			cdev_del(&mycdev_devices[i].cdev);
+		}
+		/* device nodes */
+		for(i = 0; i <= lastSuccessfulNode; i++)
+		{
+			device_destroy(asp_mycdev_class, MKDEV(mycdev_major, mycdev_minor + i));
 		}
 		/* free up device array */
 		kfree(mycdev_devices);
 		mycdev_devices = NULL;
+		printk(KERN_DEBUG "%s: Freed up %d devices/ramdisks.\n", MODULE_NAME, lastSuccessfulRamdisk+1);
+		printk(KERN_DEBUG "%s: Freed up %d devices/nodes.\n", MODULE_NAME, lastSuccessfulNode+1);
+		printk(KERN_DEBUG "%s: Freed up %d devices/cdevs.\n", MODULE_NAME, lastSuccessfulCdev+1);
+
 	}
-	printk(KERN_DEBUG "%s: Freed up %d devices/ramdisks.\n", MODULE_NAME, lastDevice);
+
+	/* Clean up device class */
+	if(!IS_ERR(asp_mycdev_class)){
+		class_destroy(asp_mycdev_class);
+		asp_mycdev_class = NULL;
+		printk(KERN_DEBUG "%s: Freed up %s device class.\n", MODULE_NAME, MODULE_CLASS_NAME);
+	}
 
 	/* Cleaning up the chrdev_region,
 	this is never called if the registration failes */

@@ -4,7 +4,7 @@
 * @Email:  izharits@gmail.com
 * @Filename: module.h
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T13:41:43-04:00
+ * @Last modified time: 2017-03-20T17:17:50-04:00
 * @License: MIT
 */
 
@@ -14,6 +14,7 @@
 #define __ASP_MYCDEV__
 
 #include <linux/mutex.h>
+#include <linux/device.h>
 
 /* Defaul size of each device */
 #define		DEFAULT_RAMDISK_SIZE	16*PAGE_SIZE
@@ -28,6 +29,8 @@
 
 /* Module name */
 #define		MODULE_NAME						"asp_mycdev"
+#define		MODULE_CLASS_NAME			"asp_mycdev_class"
+#define		MODULE_NODE_NAME			"mycdev"
 
 /* Device struct */
 struct asp_mycdev
@@ -37,6 +40,7 @@ struct asp_mycdev
 	size_t ramdiskSize; 	/* device size */
 	struct mutex lock;		/* mutex for this device */
 	struct cdev cdev;			/* char device struct */
+	struct device *device;/* device node in sysfs */
 	bool devReset;				/* flag to indicate that the device is reset */
 };
 
