@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-21T16:31:13-04:00
+ * @Last modified time: 2017-03-21T16:52:25-04:00
  * @License: MIT
  */
 
@@ -356,7 +356,7 @@ static int mycdev_init_module(void)
 
 	/* Setup the device class, needed to create device nodes in sysfs */
 	asp_mycdev_class = class_create(THIS_MODULE, MODULE_CLASS_NAME);
-	if(IS_ERR(asp_mycdev_class)){
+	if(IS_ERR_OR_NULL(asp_mycdev_class)){
 		printk(KERN_WARNING "%s: Failed to Init Device Class %s\n",\
 			MODULE_NAME, MODULE_CLASS_NAME);
 		retval = -1;
@@ -401,7 +401,7 @@ static int mycdev_init_module(void)
 
 		mycdev_devices[i].device = device_create(asp_mycdev_class, NULL,\
 			MKDEV(mycdev_major, mycdev_minor + i), NULL, nodeName);
-		if(IS_ERR(mycdev_devices[i].device))
+		if(IS_ERR_OR_NULL(mycdev_devices[i].device))
 		{
 			/* mark that we failed to create and register current device node with sysfs,
 			we will clean up previously device nodes in cleanup module */
@@ -490,7 +490,7 @@ static void mycdev_cleanup_module(void)
 	}
 
 	/* Clean up device class */
-	if(!IS_ERR(asp_mycdev_class)){
+	if(!IS_ERR_OR_NULL(asp_mycdev_class)){
 		class_destroy(asp_mycdev_class);
 		asp_mycdev_class = NULL;
 		printk(KERN_DEBUG "%s: Freed up %s device class.\n", MODULE_NAME, MODULE_CLASS_NAME);
