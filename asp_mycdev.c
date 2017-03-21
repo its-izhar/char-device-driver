@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T22:46:08-04:00
+ * @Last modified time: 2017-03-21T16:31:13-04:00
  * @License: MIT
  */
 
@@ -49,10 +49,20 @@ static int asp_mycdev_open(struct inode *, struct file *);
 static int asp_mycdev_release(struct inode *, struct file *);
 static ssize_t asp_mycdev_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t asp_mycdev_write(struct file *, const char __user *, size_t, loff_t *);
+loff_t asp_mycdev_lseek(struct file *, loff_t, int);
 
 
 /* Function definitions */
 /* open function */
+/**
+ * asp_mycdev_open -
+ * @i_ptr: pointer to current inode being pointed after open sys call
+ * @filp:	pointer to current file descriptor struct after open sys call
+ * Description:
+ 		Extracts the custom device struct from current cdev, and stores it in file's
+		private_data field
+ * Return: 0, Always succeeds
+ */
 static int asp_mycdev_open(struct inode *i_ptr, struct file *filp)
 {
 	struct asp_mycdev *mycdev = NULL;
@@ -71,6 +81,13 @@ static int asp_mycdev_open(struct inode *i_ptr, struct file *filp)
 
 
 /* release function */
+/**
+ * asp_mycdev_release -
+ * @i_ptr: current inode being referred to`
+ * @filp: file descriptor pointer
+ * Description: Releases the device
+ * Return: 0, Always succeeds
+ */
 static int asp_mycdev_release(struct inode *i_ptr, struct file *filp)
 {
 	struct asp_mycdev *mycdev = filp->private_data;
@@ -82,6 +99,17 @@ static int asp_mycdev_release(struct inode *i_ptr, struct file *filp)
 
 
 /* read from device */
+/**
+ * asp_mycdev_read -
+ * @filp: file pointer
+ * @buf: buffer handle provided from userspace
+ * @count: bytes requested to read and store in buf
+ * @f_offset: current position in the file
+ * Description:
+ 		Reads requested number of bytes from device and updates the current position
+		in the file
+ * Return: Number of bytes read from the device
+ */
 static ssize_t asp_mycdev_read(struct file *filp, char __user *buf, size_t count,\
 	 loff_t *f_offset)
 {
@@ -92,8 +120,12 @@ static ssize_t asp_mycdev_read(struct file *filp, char __user *buf, size_t count
 		return -ERESTARTSYS;
 	if(*f_offset > mycdev->ramdiskSize)			/* already done */
 		goto EXIT;
-	if((count + *f_offset) > mycdev->ramdiskSize)		/* read beyond our device size */
-		retval = mycdev->ramdiskSize - *f_offset;
+	if((count + *f_offset) > mycdev->ramdiskSize) { /* read beyond our device size */
+		printk(KERN_WARNING "%s: device %s%d: Attempt to READ beyond the device size!\n",\
+			MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID);
+			/* read only upte the device size */
+			count = mycdev->ramdiskSize - *f_offset;
+	}
 
 	/* copy to user and update the offset in the device */
 	retval = count - copy_to_user(buf, (mycdev->ramdisk + *f_offset), count);
@@ -109,6 +141,17 @@ EXIT:
 
 
 /* write to device */
+/**
+ * asp_mycdev_write
+ * @filp: file pointer
+ * @buf: buffer handle provided from userspace
+ * @count: bytes requested to write from buffer
+ * @f_offset: current position in the file
+ * Description:
+ 		Writes the requested number of bytes to the device and updates the file position
+		in the device
+ * Return: Number of bytes written to the device
+ */
 static ssize_t asp_mycdev_write(struct file *filp, const char __user *buf, \
 	size_t count, loff_t *f_offset)
 {
@@ -117,8 +160,11 @@ static ssize_t asp_mycdev_write(struct file *filp, const char __user *buf, \
 
 	if(mutex_lock_interruptible(&mycdev->lock))		/* ENTER Critical Section */
 		return -ERESTARTSYS;
-	if((count + *f_offset) > mycdev->ramdiskSize)		/* write beyond our device size */
+	if((count + *f_offset) > mycdev->ramdiskSize) { /* write beyond our device size */
+		printk(KERN_WARNING "%s: device %s%d: Attempt to WRITE beyond the device size! Returning!\n",\
+			MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID);
 		goto EXIT;
+	}
 
 	/* copy to user and update the offset in the device */
 	retval = count - copy_from_user((mycdev->  ramdisk + *f_offset), buf, count);
@@ -133,11 +179,113 @@ EXIT:
 }
 
 
+/* set the ramdisk offset to desired offset in the device */
+/**
+ * asp_mycdev_lseek -
+ * @filp: file pointer
+ * @f_offset: requested offset to be set the file
+ * @action: SEEK_SET/ SEEK_CUR/ SEEK_END
+ * Description:
+ 		Set the current position in ramdisk to desired offset, based on action:
+		SEEK_SET: set to requested offset
+		SEEK_CUR: set to current offset + requested offset
+		SEEK_END: set to the requested offset from the end of file
+
+		This function also resizes the ramdisk in the device if the requested offset
+		is beyond the current file ramdisk size, and fills the extra region with zeros
+ * Return:
+ */
+loff_t asp_mycdev_lseek(struct file *filp, loff_t f_offset, int action)
+{
+	loff_t new_offset;
+	struct asp_mycdev *mycdev = filp->private_data;
+
+	/* ENTER Critical Section */
+	if(mutex_lock_interruptible(&mycdev->lock))
+		return -ERESTARTSYS;
+
+	switch (action)
+	{
+		case SEEK_SET:
+			new_offset = f_offset;
+			break;
+
+		case SEEK_CUR:
+			new_offset = filp->f_pos + f_offset;
+			break;
+
+		case SEEK_END:
+			new_offset = mycdev->ramdiskSize + f_offset;
+			break;
+
+		default:
+			new_offset = -EINVAL;
+			goto EXIT;
+	}
+	/* validity checks (lower boundary) */
+	new_offset = (new_offset < 0)? 0: new_offset;
+
+	printk(KERN_DEBUG "%s: device %s%d: Current offset: %ld, Requested offset: %ld\n",\
+	MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID, (long) filp->f_pos, (long) new_offset);
+
+	/* if the new_offset is beyond the current size of ramdisk,
+	reallocate ramdisk to hold double the current size
+	and fill the remaining region with all zeros */
+	if(new_offset > mycdev->ramdiskSize)
+	{
+		char *new_ramdisk = NULL;
+		int pages = -1;
+		size_t old_ramdiskSize = -1;
+		size_t new_ramdiskSize = -1;
+
+		/* find the new ramdisk size which is multiple of PAGE_SIZE */
+		pages = new_offset / PAGE_SIZE;		// Assert (pages >= 1)
+		pages = (new_offset % PAGE_SIZE > 0)? pages+1 : pages;
+		new_ramdiskSize = pages * PAGE_SIZE;
+
+		/* reallocate ramdisk */
+		new_ramdisk = krealloc(mycdev->ramdisk, new_ramdiskSize, GFP_KERNEL);
+		if(new_ramdisk != NULL)
+		{
+			/* save old ramdiskSize, we will need it to update the expanded memory */
+			old_ramdiskSize = mycdev->ramdiskSize;
+			/* realloc succeeded, zero out the extra memory */
+			mycdev->ramdisk = new_ramdisk;
+			mycdev->ramdiskSize = new_ramdiskSize;
+			memset(mycdev->ramdisk + old_ramdiskSize, 0, new_ramdiskSize - old_ramdiskSize);
+
+			printk(KERN_DEBUG "%s: device %s%d: Ramdisk resized! "
+				"old_ramdiskSize: %d, new_ramdiskSize: %d, zerod out memory: %d\n",\
+				MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID, \
+				(int) old_ramdiskSize, (int) new_ramdiskSize, (int) (new_ramdiskSize - old_ramdiskSize));
+		}
+		else {
+			/* realloc failed, old ramdisk handle is still valid */
+			printk(KERN_DEBUG "%s: device %s%d: Failed to reallocate ramdisk!\n",\
+				MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID);
+
+			new_offset = -ENOMEM;
+			goto EXIT;
+		}
+	}
+	/* update the current seek */
+	filp->f_pos = new_offset;
+
+	printk(KERN_DEBUG "%s: device %s%d: Seeking to position: %ld\n",\
+		MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID, (long) new_offset);
+
+EXIT:
+	mutex_unlock(&mycdev->lock);
+	return new_offset;
+}
+
+
 /* fileops for asp_mycdev */
 static struct file_operations asp_mycdev_fileops = {
 	.owner  = THIS_MODULE,
 	.open   = asp_mycdev_open,
 	.read   = asp_mycdev_read,
+	.llseek = asp_mycdev_lseek,
 	.write  = asp_mycdev_write,
 	.release = asp_mycdev_release,
 };
@@ -332,9 +480,13 @@ static void mycdev_cleanup_module(void)
 		/* free up device array */
 		kfree(mycdev_devices);
 		mycdev_devices = NULL;
-		printk(KERN_DEBUG "%s: Freed up %d devices/ramdisks.\n", MODULE_NAME, lastSuccessfulRamdisk+1);
-		printk(KERN_DEBUG "%s: Freed up %d devices/nodes.\n", MODULE_NAME, lastSuccessfulNode+1);
-		printk(KERN_DEBUG "%s: Freed up %d devices/cdevs.\n", MODULE_NAME, lastSuccessfulCdev+1);
+
+		printk(KERN_DEBUG "%s: Freed up %d devices/ramdisks.\n",\
+			MODULE_NAME, lastSuccessfulRamdisk + 1);
+		printk(KERN_DEBUG "%s: Freed up %d devices/nodes.\n",\
+			MODULE_NAME, lastSuccessfulNode + 1);
+		printk(KERN_DEBUG "%s: Freed up %d devices/cdevs.\n",\
+			MODULE_NAME, lastSuccessfulCdev + 1);
 	}
 
 	/* Clean up device class */

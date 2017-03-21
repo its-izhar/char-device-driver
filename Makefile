@@ -3,7 +3,7 @@
 # @Email:  izharits@gmail.com
 # @Filename: Makefile
 # @Last modified by:   izhar
-# @Last modified time: 2017-03-20T21:24:35-04:00
+# @Last modified time: 2017-03-21T15:33:00-04:00
 # @License: MIT
 
 
@@ -12,7 +12,9 @@ obj-m := asp_mycdev.o
 
 all: clean
 	make -C /usr/src/linux-headers-4.8.0-39-generic M=$(PWD) modules
+	gcc -Wall -Werror -O2 -o rw_test rw_test.c
+	gcc -Wall -Werror -O2 -o lseek_test lseek_test.c
 
 clean:
 	make -C /usr/src/linux-headers-4.8.0-39-generic M=$(PWD) clean
-	rm -f *.o.cmd *.symvers *.order *.gch
+	rm -f *.o.cmd *.symvers *.order *.gch rw_test lseek_test

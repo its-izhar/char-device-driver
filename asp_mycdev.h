@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.h
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T22:44:47-04:00
+ * @Last modified time: 2017-03-21T15:36:18-04:00
  * @License: MIT
  */
 
@@ -16,8 +16,8 @@
 #include <linux/mutex.h>
 #include <linux/device.h>
 
-/* Defaul size of each device */
-#define  DEFAULT_RAMDISK_SIZE 16*PAGE_SIZE
+/* Defaul size of each device - keep it multiple of PAGE_SIZE */
+#define  DEFAULT_RAMDISK_SIZE  2*PAGE_SIZE
 
 /* Dynamic Major by default */
 #define   DEFAULT_MAJOR         0
