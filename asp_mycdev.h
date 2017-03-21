@@ -1,12 +1,12 @@
 /**
-* @Author: Izhar Shaikh <izhar>
-* @Date:   2017-03-19T22:51:36-04:00
-* @Email:  izharits@gmail.com
-* @Filename: module.h
+ * @Author: Izhar Shaikh <izhar>
+ * @Date:   2017-03-20T19:24:05-04:00
+ * @Email:  izharits@gmail.com
+ * @Filename: asp_mycdev.h
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T19:24:05-04:00
-* @License: MIT
-*/
+ * @Last modified time: 2017-03-20T22:44:47-04:00
+ * @License: MIT
+ */
 
 
 
@@ -28,9 +28,10 @@
 #define   DEFAULT_NUM_DEVICES  3
 
 /* Module name */
-#define  MODULE_NAME      "asp_mycdev"
-#define  MODULE_CLASS_NAME   "asp_mycdev_class"
+#define  MODULE_NAME     "asp_mycdev"
+#define  MODULE_CLASS_NAME  "asp_mycdev_class"
 #define  MODULE_NODE_NAME   "mycdev"
+#define  MAX_NODE_NAME_SIZE  10
 
 /* Device struct */
 struct asp_mycdev

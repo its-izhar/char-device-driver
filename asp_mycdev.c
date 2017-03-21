@@ -1,12 +1,12 @@
 /**
-* @Author: Izhar Shaikh <izhar>
-* @Date:   2017-03-19T22:00:12-04:00
-* @Email:  izharits@gmail.com
-* @Filename: module.c
+ * @Author: Izhar Shaikh <izhar>
+ * @Date:   2017-03-20T19:44:34-04:00
+ * @Email:  izharits@gmail.com
+ * @Filename: asp_mycdev.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-20T19:39:21-04:00
-* @License: MIT
-*/
+ * @Last modified time: 2017-03-20T22:46:08-04:00
+ * @License: MIT
+ */
 
 
 
@@ -17,11 +17,11 @@
 #include <linux/fs.h>     /* Needed for file_operations */
 #include <linux/slab.h>    /* Needed for kmalloc, kzalloc etc. */
 #include <linux/errno.h>   /* Needed for error checking */
-#include <linux/mutex.h>
-#include "asp_mycdev.h"    /* Custom header for the drivers */
 #include <linux/mutex.h>	/* Sync primitives */
 #include <linux/device.h>	/* device class */
+#include <asm/uaccess.h>	/* copy_*_user */
 
+#include "asp_mycdev.h"    /* Custom header for the drivers */
 
 /* Parameters that can be changed at load time */
 static int mycdev_major = DEFAULT_MAJOR;
@@ -45,29 +45,102 @@ static int lastSuccessfulNode = -1;
 /* Function declarations */
 static int mycdev_init_module(void);
 static void mycdev_cleanup_module(void);
-
-#if 0
 static int asp_mycdev_open(struct inode *, struct file *);
 static int asp_mycdev_release(struct inode *, struct file *);
 static ssize_t asp_mycdev_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t asp_mycdev_write(struct file *, const char __user *, size_t, loff_t *);
-#endif
+
 
 /* Function definitions */
-// TODO :: Implement read/write/open/release
+/* open function */
+static int asp_mycdev_open(struct inode *i_ptr, struct file *filp)
+{
+	struct asp_mycdev *mycdev = NULL;
+
+	/* Get the struct of current device */
+	mycdev = container_of(i_ptr->i_cdev, struct asp_mycdev, cdev);
+
+	/* Make device ready for future use */
+	mycdev->devReset = false;
+	filp->private_data = mycdev;		/* for later use by other functions */
+
+	printk(KERN_INFO "%s: device %s%d opened [Major: %d, Minor: %d]\n",\
+	 	MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID, imajor(i_ptr), iminor(i_ptr));
+	return 0;
+}
+
+
+/* release function */
+static int asp_mycdev_release(struct inode *i_ptr, struct file *filp)
+{
+	struct asp_mycdev *mycdev = filp->private_data;
+
+	printk(KERN_INFO "%s: device %s%d closed\n",\
+	 	MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID);
+	return 0;
+}
+
+
+/* read from device */
+static ssize_t asp_mycdev_read(struct file *filp, char __user *buf, size_t count,\
+	 loff_t *f_offset)
+{
+	struct asp_mycdev *mycdev = filp->private_data;
+	ssize_t retval = 0;
+
+	if(mutex_lock_interruptible(&mycdev->lock))		/* ENTER Critical Section */
+		return -ERESTARTSYS;
+	if(*f_offset > mycdev->ramdiskSize)			/* already done */
+		goto EXIT;
+	if((count + *f_offset) > mycdev->ramdiskSize)		/* read beyond our device size */
+		retval = mycdev->ramdiskSize - *f_offset;
+
+	/* copy to user and update the offset in the device */
+	retval = count - copy_to_user(buf, (mycdev->ramdisk + *f_offset), count);
+	*f_offset += retval;
+
+	printk(KERN_DEBUG "%s: device %s%d: bytes read: %d, current position: %d\n",\
+		MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID, (int)retval, (int)*f_offset);
+
+EXIT:
+	mutex_unlock(&mycdev->lock);			/* EXIT Critical Section */
+	return retval;
+}
+
+
+/* write to device */
+static ssize_t asp_mycdev_write(struct file *filp, const char __user *buf, \
+	size_t count, loff_t *f_offset)
+{
+	struct asp_mycdev *mycdev = filp->private_data;
+	ssize_t retval = -ENOMEM;
+
+	if(mutex_lock_interruptible(&mycdev->lock))		/* ENTER Critical Section */
+		return -ERESTARTSYS;
+	if((count + *f_offset) > mycdev->ramdiskSize)		/* write beyond our device size */
+		goto EXIT;
+
+	/* copy to user and update the offset in the device */
+	retval = count - copy_from_user((mycdev->  ramdisk + *f_offset), buf, count);
+	*f_offset += retval;
+
+	printk(KERN_DEBUG "%s: device %s%d: bytes written: %d, current position: %d\n",\
+		MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID, (int)retval, (int)*f_offset);
+
+EXIT:
+	mutex_unlock(&mycdev->lock);			/* EXIT Critical Section */
+	return retval;
+}
 
 
 /* fileops for asp_mycdev */
 static struct file_operations asp_mycdev_fileops = {
 	.owner  = THIS_MODULE,
-#if 0
 	.open   = asp_mycdev_open,
-	.release = asp_mycdev_release,
 	.read   = asp_mycdev_read,
 	.write  = asp_mycdev_write,
-#endif
+	.release = asp_mycdev_release,
 };
-
 
 
 /**
@@ -120,10 +193,10 @@ static int mycdev_init_module(void)
 	 unless otherwise specified at load time */
 	if(mycdev_major || mycdev_minor) {
 		devNum = MKDEV(mycdev_major, mycdev_minor);
-		retval = register_chrdev_region(devNum, max_devices, "mycdev");
+		retval = register_chrdev_region(devNum, max_devices, MODULE_NODE_NAME);
 	}
 	else {
-		retval = alloc_chrdev_region(&devNum, mycdev_minor, max_devices, "mycdev");
+		retval = alloc_chrdev_region(&devNum, mycdev_minor, max_devices, MODULE_NODE_NAME);
 		mycdev_major = MAJOR(devNum);
 	}
 	if(retval < 0){
@@ -153,7 +226,7 @@ static int mycdev_init_module(void)
 	/* Setup the devices */
 	for(i = 0; i < max_devices; i++)
 	{
-		char nodeName[10] = { 0 };
+		char nodeName[MAX_NODE_NAME_SIZE] = { 0 };
 		int cdevStatus = 0;
 
 		/* Device Reset flag */
@@ -200,7 +273,6 @@ static int mycdev_init_module(void)
 			break;
 		}
 		lastSuccessfulCdev = i;
-
 	}
 	/* cleanup if we failed to allocate device memory */
 	if(ramdiskAllocFailed || nodeSetupFailed || cdevSetupFailed)
