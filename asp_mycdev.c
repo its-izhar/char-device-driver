@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-21T22:07:43-04:00
+ * @Last modified time: 2017-03-22T01:30:38-04:00
  * @License: MIT
  */
 
@@ -71,7 +71,7 @@ static int asp_mycdev_open(struct inode *i_ptr, struct file *filp)
 	mycdev = container_of(i_ptr->i_cdev, struct asp_mycdev, cdev);
 
 	/* Make device ready for future use */
-	mycdev->devReset = false;		/* this is needed so read doesn't freak out */
+	mycdev->devReset = false;
 	filp->private_data = mycdev;		/* for later use by other functions */
 
 	printk(KERN_INFO "%s: device %s%d opened [Major: %d, Minor: %d]\n",\
@@ -118,8 +118,6 @@ static ssize_t asp_mycdev_read(struct file *filp, char __user *buf, size_t count
 
 	if(mutex_lock_interruptible(&mycdev->lock))		/* ENTER Critical Section */
 		return -ERESTARTSYS;
-	if(mycdev->devReset == true)				/* device has been reset by IOCTL */
-		goto EXIT;
 	if(*f_offset > mycdev->ramdiskSize)			/* already done */
 		goto EXIT;
 	if((count + *f_offset) > mycdev->ramdiskSize) { /* read beyond our device size */
