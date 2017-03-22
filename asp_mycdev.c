@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-21T22:02:56-04:00
+ * @Last modified time: 2017-03-21T22:07:43-04:00
  * @License: MIT
  */
 
@@ -308,8 +308,8 @@ long asp_mycdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			retval = 1;
 			break;
 
-			default:
-			/* the control is unlikely to come here after MAXNR check above */
+		/* the control is unlikely to come here after MAXNR check above */
+		default:
 			return -ENOTTY;
 	}
 
