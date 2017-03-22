@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-21T16:52:25-04:00
+ * @Last modified time: 2017-03-21T22:02:56-04:00
  * @License: MIT
  */
 
@@ -50,7 +50,7 @@ static int asp_mycdev_release(struct inode *, struct file *);
 static ssize_t asp_mycdev_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t asp_mycdev_write(struct file *, const char __user *, size_t, loff_t *);
 loff_t asp_mycdev_lseek(struct file *, loff_t, int);
-
+long asp_mycdev_ioctl(struct file *, unsigned int, unsigned long);
 
 /* Function definitions */
 /* open function */
@@ -71,7 +71,7 @@ static int asp_mycdev_open(struct inode *i_ptr, struct file *filp)
 	mycdev = container_of(i_ptr->i_cdev, struct asp_mycdev, cdev);
 
 	/* Make device ready for future use */
-	mycdev->devReset = false;
+	mycdev->devReset = false;		/* this is needed so read doesn't freak out */
 	filp->private_data = mycdev;		/* for later use by other functions */
 
 	printk(KERN_INFO "%s: device %s%d opened [Major: %d, Minor: %d]\n",\
@@ -118,6 +118,8 @@ static ssize_t asp_mycdev_read(struct file *filp, char __user *buf, size_t count
 
 	if(mutex_lock_interruptible(&mycdev->lock))		/* ENTER Critical Section */
 		return -ERESTARTSYS;
+	if(mycdev->devReset == true)				/* device has been reset by IOCTL */
+		goto EXIT;
 	if(*f_offset > mycdev->ramdiskSize)			/* already done */
 		goto EXIT;
 	if((count + *f_offset) > mycdev->ramdiskSize) { /* read beyond our device size */
@@ -167,6 +169,7 @@ static ssize_t asp_mycdev_write(struct file *filp, const char __user *buf, \
 	}
 
 	/* copy to user and update the offset in the device */
+	mycdev->devReset = false;
 	retval = count - copy_from_user((mycdev->  ramdisk + *f_offset), buf, count);
 	*f_offset += retval;
 
@@ -280,6 +283,45 @@ EXIT:
 }
 
 
+/* IOCTL calls */
+long asp_mycdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	long retval = -1;
+	struct asp_mycdev *mycdev = NULL;
+
+	/* Extracts type and number bitfields;
+	don't decode wrong commands; return -ENOTTY (Inappropriate IOCTL)  */
+	if(_IOC_TYPE(cmd) != ASP_MYCDEV_MAGIC)
+		return -ENOTTY;
+	if(_IOC_NR(cmd) > ASP_IOCTL_MAXNR)
+		return -ENOTTY;
+
+	/* If everything is fine, extract the command and perform action */
+	mycdev = filp->private_data;
+	switch (cmd)
+	{
+		/* clear the ramdisk & seek to start of the file */
+		case ASP_CLEAR_BUF:
+			memset(mycdev->ramdisk, 0, mycdev->ramdiskSize);
+			filp->f_pos = 0;
+			mycdev->devReset = true;
+			retval = 1;
+			break;
+
+			default:
+			/* the control is unlikely to come here after MAXNR check above */
+			return -ENOTTY;
+	}
+
+	/* Just to debug */
+	if(retval == 1){
+		printk(KERN_DEBUG "%s: device %s%d: Successful Reset!\n",\
+			MODULE_NAME, "/dev/"MODULE_NODE_NAME, mycdev->devID);
+	}
+	return retval;
+}
+
+
 /* fileops for asp_mycdev */
 static struct file_operations asp_mycdev_fileops = {
 	.owner  = THIS_MODULE,
@@ -288,6 +330,7 @@ static struct file_operations asp_mycdev_fileops = {
 	.llseek = asp_mycdev_lseek,
 	.write  = asp_mycdev_write,
 	.release = asp_mycdev_release,
+	.unlocked_ioctl = asp_mycdev_ioctl,
 };
 
 

@@ -3,7 +3,7 @@
 # @Email:  izharits@gmail.com
 # @Filename: Makefile
 # @Last modified by:   izhar
-# @Last modified time: 2017-03-21T15:33:00-04:00
+# @Last modified time: 2017-03-21T21:40:07-04:00
 # @License: MIT
 
 
@@ -14,7 +14,8 @@ all: clean
 	make -C /usr/src/linux-headers-4.8.0-39-generic M=$(PWD) modules
 	gcc -Wall -Werror -O2 -o rw_test rw_test.c
 	gcc -Wall -Werror -O2 -o lseek_test lseek_test.c
+	gcc -Wall -Werror -O2 -o ioctl_test ioctl_test.c
 
 clean:
 	make -C /usr/src/linux-headers-4.8.0-39-generic M=$(PWD) clean
-	rm -f *.o.cmd *.symvers *.order *.gch rw_test lseek_test
+	rm -f *.o.cmd *.symvers *.order *.gch rw_test lseek_test ioctl_test

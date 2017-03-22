@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.h
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-21T15:36:18-04:00
+ * @Last modified time: 2017-03-21T21:42:15-04:00
  * @License: MIT
  */
 
@@ -45,4 +45,13 @@ struct asp_mycdev
 	bool devReset;				/* flag to indicate that the device is reset */
 };
 
-#endif
+/* IOCTLs */
+#define	ASP_MYCDEV_MAGIC		0x37
+
+/* clear the ramdisk and sets the file position at the beginning */
+#define	ASP_CLEAR_BUF		_IO(ASP_MYCDEV_MAGIC, 0)
+
+/* Maximum number of IOCTL defs implemented in this driver */
+#define ASP_IOCTL_MAXNR		0
+
+#endif	/* __ASP_MYCDEV__ */
