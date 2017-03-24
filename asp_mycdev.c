@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-22T01:30:38-04:00
+ * @Last modified time: 2017-03-24T12:33:31-04:00
  * @License: MIT
  */
 
@@ -296,6 +296,11 @@ long asp_mycdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	/* If everything is fine, extract the command and perform action */
 	mycdev = filp->private_data;
+
+	/* Enter Critical Section */
+	if(mutex_lock_interruptible(&mycdev->lock))
+		return -ERESTARTSYS;
+
 	switch (cmd)
 	{
 		/* clear the ramdisk & seek to start of the file */
@@ -308,8 +313,11 @@ long asp_mycdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		/* the control is unlikely to come here after MAXNR check above */
 		default:
-			return -ENOTTY;
+			retval = -ENOTTY;
 	}
+
+	/* Exit Critical Section */
+	mutex_unlock(&mycdev->lock);
 
 	/* Just to debug */
 	if(retval == 1){

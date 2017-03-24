@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: ioctl_test.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-21T21:45:30-04:00
+ * @Last modified time: 2017-03-24T12:46:37-04:00
  * @License: MIT
  */
 
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
   /* Resetting the device now */
   printf("Resetting the device now ...\n");
   if(ioctl(fd2, ASP_CLEAR_BUF) == 1) {
-          printf("ASP_CLEAR_BUF has succesfully resetted %s\n", nodename);
+          printf("ASP_CLEAR_BUF has succesfully reset %s\n", nodename);
   }
   else {
           printf("IOCTL: ASP_CLEAR_BUF failed!\n");
