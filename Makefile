@@ -3,14 +3,14 @@
 # @Email:  izharits@gmail.com
 # @Filename: Makefile
 # @Last modified by:   izhar
-# @Last modified time: 2017-03-24T12:52:23-04:00
+# @Last modified time: 2017-03-24T13:05:05-04:00
 # @License: MIT
 
 
 
 obj-m := asp_mycdev.o
 
-all: clean
+all:
 	make -C /usr/src/linux-headers-$(shell uname -r) M=$(PWD) modules
 	gcc -Wall -Werror -O2 -o rw_test rw_test.c
 	gcc -Wall -Werror -O2 -o lseek_test lseek_test.c
