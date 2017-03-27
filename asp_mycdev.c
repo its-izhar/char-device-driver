@@ -4,7 +4,7 @@
  * @Email:  izharits@gmail.com
  * @Filename: asp_mycdev.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-03-24T12:33:31-04:00
+ * @Last modified time: 2017-03-26T23:24:24-04:00
  * @License: MIT
  */
 
@@ -49,8 +49,8 @@ static int asp_mycdev_open(struct inode *, struct file *);
 static int asp_mycdev_release(struct inode *, struct file *);
 static ssize_t asp_mycdev_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t asp_mycdev_write(struct file *, const char __user *, size_t, loff_t *);
-loff_t asp_mycdev_lseek(struct file *, loff_t, int);
-long asp_mycdev_ioctl(struct file *, unsigned int, unsigned long);
+static loff_t asp_mycdev_lseek(struct file *, loff_t, int);
+static long asp_mycdev_ioctl(struct file *, unsigned int, unsigned long);
 
 /* Function definitions */
 /* open function */
